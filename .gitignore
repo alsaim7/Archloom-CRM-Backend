@@ -1,0 +1,16 @@
+# Ignore .env file containing sensitive information
+.env
+
+# Ignore Python bytecode files
+__pycache__/
+
+# Ignore virtual environment directory
+archloomenv/
+
+# Ignore database file
+Anime.db
+
+archloom.db
+
+seed_user.py
+seed_customer.py

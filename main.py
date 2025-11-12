@@ -6,6 +6,7 @@ import models
 from fastapi.middleware.cors import CORSMiddleware
 from routers.registration import router as registration_router
 from routers.auth import router as auth_router
+from routers.users import router as users_router
 
 
 app = FastAPI(
@@ -33,6 +34,7 @@ def root():
 
 app.include_router(registration_router)
 app.include_router(auth_router)
+app.include_router(users_router)
 
 
 app.add_middleware(

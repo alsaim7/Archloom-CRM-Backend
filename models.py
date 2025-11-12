@@ -1,8 +1,10 @@
 # models.py
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 from sqlmodel import SQLModel, Field, UniqueConstraint
 from sqlalchemy import Column, Date, UniqueConstraint
+from sqlalchemy import Column, JSON
+from schemas.registration_schema import NoteEntry
 
 class CustomerModel(SQLModel, table=True):
     __tablename__ = "customers"
@@ -17,7 +19,7 @@ class CustomerModel(SQLModel, table=True):
     email: Optional[str] = Field(default=None, nullable=True)
     address: str
     reg_date: date = Field(sa_column=Column(Date, nullable=False))
-    note: Optional[str] = Field(default=None, nullable=True)
+    notes: List[NoteEntry] = Field(sa_column=Column(JSON), default=[]) 
     status: str = Field(
         default="ACTIVE", index=True,
         description="Lead status: ACTIVE or OnHold or CLOSED",
@@ -42,6 +44,7 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True, nullable=False)
     password_hash: str = Field(nullable=False)
     role: str = Field(default="employee", description="Role: employee | admin")
+    is_active: bool = Field(default=True, description="Indicates whether the user is active or deactivated")
 
     # # ✅ Optional: relationship back to customers
     # customers: List["CustomerModel"] = Relationship(back_populates="user")

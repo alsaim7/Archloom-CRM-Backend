@@ -17,3 +17,9 @@ class TokenData(SQLModel):
 class UserPublic(SQLModel):
     id: int
     email: EmailStr
+
+class UserReadSchema(SQLModel):
+    id: int  # Add this field - it's essential for the assignment
+    name: str
+    email: EmailStr
+    role: Optional[str] = None  # Add role if you want to display it in the dropdown

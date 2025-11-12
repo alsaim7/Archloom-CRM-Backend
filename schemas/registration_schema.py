@@ -1,9 +1,15 @@
 # schemas.py
 import re
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 from sqlmodel import SQLModel
 from pydantic import EmailStr, field_validator
+
+
+
+class NoteEntry(SQLModel):
+    date: date
+    note: str
 
 class CustomerCreateSchema(SQLModel):
     fullname: str
@@ -11,7 +17,8 @@ class CustomerCreateSchema(SQLModel):
     mobile: Optional[str] = None
     email: Optional[EmailStr] = None
     address: str
-    note: Optional[str] = None
+    notes: List[NoteEntry] = []
+    assigned_to: Optional[int] = None  # Add this line
 
     @field_validator("fullname", "address", mode="before")
     @classmethod
@@ -21,7 +28,7 @@ class CustomerCreateSchema(SQLModel):
         return v
     
 
-    @field_validator("email", "note", "mobile", mode="before")
+    @field_validator("email", "mobile", mode="before")
     @classmethod
     def empty_email_to_none(cls, v):
         if v is None:
@@ -63,10 +70,12 @@ class CustomerReadSchema(SQLModel):
     mobile: Optional[str]
     email: Optional[str]
     address: str
-    note: Optional[str]
+    notes: List[NoteEntry] = []
     status: str
     hold_since: Optional[date]
     assigned_to_name: Optional[str] = None  # ✅ New field
+    assigned_to: Optional[int] = None   # ✅ add this
+
 
 
 
@@ -77,9 +86,10 @@ class CustomerUpdateSchema(SQLModel):
     mobile: Optional[str] = None
     email: Optional[EmailStr] = None
     address: Optional[str] = None
-    note: Optional[str] = None
+    notes: List[NoteEntry] = []
     status: Optional[str] = "ACTIVE"
     hold_since: Optional[date] = None
+    assigned_to: Optional[int] = None
 
     # Strip strings
     @field_validator("fullname", "address", mode="before")
@@ -90,7 +100,7 @@ class CustomerUpdateSchema(SQLModel):
         return v
 
 
-    @field_validator("email", "note", "mobile", mode="before")
+    @field_validator("email", "mobile", mode="before")
     @classmethod
     def empty_email_to_none(cls, v):
         if v is None:

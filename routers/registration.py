@@ -17,8 +17,6 @@ router = APIRouter(
 
 
 
-
-
 # -------------------------------
 # Create customer
 # -------------------------------
@@ -31,6 +29,12 @@ def create_customer(
     try:
         customer_id = _next_customer_id(db)
 
+        # Use assigned_to from payload if provided AND user is admin, otherwise use current user
+        if current_user.role == "admin" and payload.assigned_to:
+            assigned_to = payload.assigned_to
+        else:
+            assigned_to = current_user.id
+
         customer = CustomerModel(
             customer_id=customer_id,
             fullname=payload.fullname,
@@ -38,15 +42,22 @@ def create_customer(
             email=payload.email,
             address=payload.address,
             reg_date=payload.reg_date,
-            note=payload.note,
+            notes=[
+                    {
+                        "date": note.date.strftime("%Y-%m-%d") if isinstance(note.date, (datetime, date)) else note.date,
+                        "note": note.note
+                    }
+                    for note in payload.notes
+                ] if payload.notes else [],
+
             status="ACTIVE",
-            assigned_to=current_user.id  # assign to logged-in user
+            assigned_to=assigned_to  # Use the determined assigned_to value
         )
 
         db.add(customer)
         db.commit()
         db.refresh(customer)
-        return customer
+        return add_user_name(db,customer)
 
     except HTTPException:
         raise
@@ -115,28 +126,50 @@ def search_customer_by_id_or_mobile(
 def filter_customers(
     date_from: Optional[date] = Query(None, description="YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="YYYY-MM-DD"),
-    status_: Optional[str] = Query(None, alias="status", description="ACTIVE | OnHold | CLOSED"),
+    status_: Optional[str] = Query(None, alias="status", description="ACTIVE | HOLD | CLOSED"),
+    assigned_to_name: Optional[str] = Query(None, description="Filter by assigned user name"),  # ✅ new
     db: Session = Depends(get_session),
-    filter_stmt=Depends(filter_customers_by_user)
+    filter_stmt=Depends(filter_customers_by_user),
+    current_user: User = Depends(get_current_user),  # ✅ required for role check
 ):
     try:
         stmt = filter_stmt(select(CustomerModel))
 
+        # Apply status/date filters
         if status_:
             stmt = stmt.where(CustomerModel.status == status_)
-
         if date_from:
             stmt = stmt.where(CustomerModel.reg_date >= date_from)
         if date_to:
             stmt = stmt.where(CustomerModel.reg_date <= date_to)
 
+        # ✅ Only admins can use assigned_to_name
+        if assigned_to_name:
+            if current_user.role != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not authorized to filter by assigned user"
+                )
+            # Search user by name
+            assigned_user = db.exec(
+                select(User).where(User.name.ilike(f"%{assigned_to_name.strip()}%"))
+            ).first()
+
+            if not assigned_user:
+                raise HTTPException(status_code=404, detail="Assigned user not found")
+
+            stmt = stmt.where(CustomerModel.assigned_to == assigned_user.id)
+
         stmt = stmt.order_by(CustomerModel.id.desc())
 
-        if not date_from and not date_to and not status_:
+        if not date_from and not date_to and not status_ and not assigned_to_name:
             stmt = stmt.limit(100)
 
         customers = db.exec(stmt).all()
         return [add_user_name(db, c) for c in customers]
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to filter customers: {str(e)}")
 
@@ -149,9 +182,11 @@ def update_customer_partial(
     customer_id: str = Path(..., description="Human-friendly ID like ARC001"),
     payload: CustomerUpdateSchema = ...,
     db: Session = Depends(get_session),
-    filter_stmt=Depends(filter_customers_by_user)
+    filter_stmt=Depends(filter_customers_by_user),
+    current_user: User = Depends(get_current_user),
 ):
     try:
+        # 1️⃣ Find customer owned by current user or accessible to admin
         stmt = filter_stmt(select(CustomerModel)).where(CustomerModel.customer_id == customer_id)
         customer = db.exec(stmt).one_or_none()
         if not customer:
@@ -159,20 +194,53 @@ def update_customer_partial(
 
         update_data = payload.model_dump(exclude_unset=True)
 
+        # 2️⃣ Restrict non-admin users to limited fields
+        if current_user.role != "admin":
+            allowed_fields = {"notes", "status", "hold_since"}
+            update_data = {k: v for k, v in update_data.items() if k in allowed_fields}
+
+        # 3️⃣ Handle status change logic
         new_status = update_data.get("status")
         if new_status in {"ACTIVE", "CLOSED"}:
             update_data["hold_since"] = None
 
-        for k, v in update_data.items():
-            setattr(customer, k, v)
+        # 4️⃣ Restrict assignment updates — only admins can change assigned_to
+        if "assigned_to" in update_data and current_user.role != "admin":
+            update_data.pop("assigned_to")
+
+        # 5️⃣ Apply updates
+        for key, value in update_data.items():
+            if key == "notes":
+                # ✅ Ensure all note dates are strings (JSON serializable)
+                sanitized_notes = [
+                    {
+                        "date": n["date"].strftime("%Y-%m-%d") if hasattr(n["date"], "strftime") else n["date"],
+                        "note": n["note"],
+                    }
+                    for n in value
+                ]
+
+                if current_user.role != "admin":
+                    # Non-admin: append to existing notes only
+                    existing = getattr(customer, "notes") or []
+                    customer.notes = existing + sanitized_notes
+                else:
+                    # Admin: can overwrite notes fully
+                    customer.notes = sanitized_notes
+            else:
+                setattr(customer, key, value)
 
         db.add(customer)
         db.commit()
         db.refresh(customer)
-        return customer
+
+        # 6️⃣ Return with assigned_to_name resolved
+        return add_user_name(db, customer)
+
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update customer: {str(e)}")
 
 

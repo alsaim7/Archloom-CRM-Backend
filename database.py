@@ -7,11 +7,11 @@ DATABASE_URL = "sqlite:///./archloom.db"
 # Load environment variables from .env file
 load_dotenv()
 
-# Prod_DB_URL = os.getenv("Prod_DB_URL")
+Prod_DB_URL = os.getenv("Prod_DB_URL")
 
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-# engine = create_engine(Prod_DB_URL)
+# engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(Prod_DB_URL)
 
 
 # get a seesion

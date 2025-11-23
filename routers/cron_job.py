@@ -1,18 +1,19 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import text
 import os
-from database import get_session  # adjust to match your project
+from database import get_session
 
 router = APIRouter()
+security = HTTPBearer()
 
 @router.get("/cron/auto-activate")
-async def auto_activate(request: Request):
-    # Security check
-    auth = request.headers.get("Authorization")
-    if auth != f"Bearer {os.getenv('SECRET_KEY')}":
+async def auto_activate(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    
+    # Only require auth in production
+    if credentials.credentials != os.getenv("CRON_SECRET"):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # SQL query
     query = text("""
         UPDATE customers
         SET status='ACTIVE',

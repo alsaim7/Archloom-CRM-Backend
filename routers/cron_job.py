@@ -10,7 +10,6 @@ security = HTTPBearer()
 @router.get("/cron/auto-activate")
 async def auto_activate(credentials: HTTPAuthorizationCredentials = Depends(security)):
     
-    # Only require auth in production
     if credentials.credentials != os.getenv("CRON_SECRET"):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -22,15 +21,16 @@ async def auto_activate(credentials: HTTPAuthorizationCredentials = Depends(secu
           AND hold_since <= CURRENT_DATE - INTERVAL '12 days';
     """)
 
-    db = get_session()
+    # FIX HERE 🔽
+    db = next(get_session())
+
     try:
-        db.exec(query)
+        db.execute(query)   # ← use execute(), NOT exec()
         db.commit()
         return {"status": "success", "message": "Hold leads auto-updated"}
     except Exception as e:
         print("🔥 CRON ERROR:", str(e))
         db.rollback()
         return {"status": "error", "message": str(e)}
-
     finally:
         db.close()

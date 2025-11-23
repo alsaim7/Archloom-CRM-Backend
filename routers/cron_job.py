@@ -4,7 +4,7 @@ from sqlalchemy import text
 import os
 from database import get_session
 
-router = APIRouter()
+router = APIRouter(tags=["Cron Jobs"])
 security = HTTPBearer()
 
 @router.get("/cron/auto-activate")
@@ -24,7 +24,7 @@ async def auto_activate(credentials: HTTPAuthorizationCredentials = Depends(secu
 
     db = get_session()
     try:
-        db.execute(query)
+        db.exec(query)
         db.commit()
         return {"status": "success", "message": "Hold leads auto-updated"}
     except Exception as e:

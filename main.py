@@ -10,6 +10,7 @@ from routers.users import router as users_router
 
 
 Front_URL = os.getenv("Front_URL")
+Domain_Front_URL = os.getenv("Domain_Front_URL")
 
 app = FastAPI(
     title="Archloom Backend API",
@@ -41,7 +42,7 @@ app.include_router(users_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[Front_URL],
+    allow_origins=[Front_URL, Domain_Front_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

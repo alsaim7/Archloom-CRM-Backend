@@ -7,10 +7,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers.registration import router as registration_router
 from routers.auth import router as auth_router
 from routers.users import router as users_router
+from routers.cron_job import router as cron_router
+
+# Environment detection
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # Default to development
+
+# Set CORS origins based on environment
+if ENVIRONMENT == "production":
+    # In production, use both Front_URL and Domain_Front_URL
+    Front_URL = os.getenv("Front_URL")
+    Domain_Front_URL = os.getenv("Domain_Front_URL")
+    if not Front_URL or not Domain_Front_URL:
+        raise ValueError("Front_URL and Domain_Front_URL must be set in production environment")
+    ALLOWED_ORIGINS = [Front_URL, Domain_Front_URL]
+else:
+    # In development, use Local_Front_URL
+    Local_Front_URL = os.getenv("Local_Front_URL")  # Default fallback
+    ALLOWED_ORIGINS = [Local_Front_URL]
 
 
-Front_URL = os.getenv("Front_URL")
-Domain_Front_URL = os.getenv("Domain_Front_URL")
 
 app = FastAPI(
     title="Archloom Backend API",
@@ -38,11 +53,12 @@ def root():
 app.include_router(registration_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(cron_router)
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[Front_URL, Domain_Front_URL],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

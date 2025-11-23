@@ -28,7 +28,9 @@ async def auto_activate(credentials: HTTPAuthorizationCredentials = Depends(secu
         db.commit()
         return {"status": "success", "message": "Hold leads auto-updated"}
     except Exception as e:
+        print("🔥 CRON ERROR:", str(e))
         db.rollback()
         return {"status": "error", "message": str(e)}
+
     finally:
         db.close()
